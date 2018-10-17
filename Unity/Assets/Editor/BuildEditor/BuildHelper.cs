@@ -2,7 +2,7 @@
 using ETModel;
 using UnityEditor;
 
-namespace MyEditor
+namespace ETEditor
 {
 	public static class BuildHelper
 	{
@@ -28,14 +28,14 @@ namespace MyEditor
 			process.StartInfo.RedirectStandardError = true;
 			process.Start();
 			string info = process.StandardOutput.ReadToEnd();
-			process.WaitForExit();
 			process.Close();
 			Log.Info(info);
 		}
 
-		[MenuItem("Tools/Web资源服务器")]
+		[MenuItem("Tools/web资源服务器")]
 		public static void OpenFileServer()
 		{
+#if !UNITY_EDITOR_OSX
 			string currentDir = System.Environment.CurrentDirectory;
 			string path = Path.Combine(currentDir, @"..\FileServer\");
 			System.Diagnostics.Process process = new System.Diagnostics.Process();
@@ -43,16 +43,20 @@ namespace MyEditor
 			process.StartInfo.WorkingDirectory = path;
 			process.StartInfo.CreateNoWindow = true;
 			process.Start();
+#else
+			string path = System.Environment.CurrentDirectory + "/../FileServer/";
+			("cd " + path + " && go run FileServer.go").Bash(path, true);
+#endif
 		}
 
-		public static void Build(PlatformType type, BuildAssetBundleOptions buildAssetBundleOptions, BuildOptions buildOptions, bool isBuildExe)
+		public static void Build(PlatformType type, BuildAssetBundleOptions buildAssetBundleOptions, BuildOptions buildOptions, bool isBuildExe, bool isContainAB)
 		{
 			BuildTarget buildTarget = BuildTarget.StandaloneWindows;
 			string exeName = "ET";
 			switch (type)
 			{
 				case PlatformType.PC:
-					buildTarget = BuildTarget.StandaloneWindows;
+					buildTarget = BuildTarget.StandaloneWindows64;
 					exeName += ".exe";
 					break;
 				case PlatformType.Android:
@@ -62,8 +66,8 @@ namespace MyEditor
 				case PlatformType.IOS:
 					buildTarget = BuildTarget.iOS;
 					break;
-				case PlatformType.WebGL:
-					buildTarget = BuildTarget.WebGL;
+				case PlatformType.MacOS:
+					buildTarget = BuildTarget.StandaloneOSX;
 					break;
 			}
 
@@ -75,12 +79,19 @@ namespace MyEditor
 			
 			Log.Info("开始资源打包");
 			BuildPipeline.BuildAssetBundles(fold, buildAssetBundleOptions, buildTarget);
-
+			
 			GenerateVersionInfo(fold);
 			Log.Info("完成资源打包");
-			
+
+			if (isContainAB)
+			{
+				FileHelper.CleanDirectory("Assets/StreamingAssets/");
+				FileHelper.CopyDirectory(fold, "Assets/StreamingAssets/");
+			}
+
 			if (isBuildExe)
 			{
+				AssetDatabase.Refresh();
 				string[] levels = {
 					"Assets/Scenes/Init.unity",
 				};
@@ -106,10 +117,6 @@ namespace MyEditor
 		{
 			foreach (string file in Directory.GetFiles(dir))
 			{
-				if (file.EndsWith(".manifest"))
-				{
-					continue;
-				}
 				string md5 = MD5Helper.FileMD5(file);
 				FileInfo fi = new FileInfo(file);
 				long size = fi.Length;

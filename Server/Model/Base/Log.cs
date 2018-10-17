@@ -35,5 +35,20 @@ namespace ETModel
 		{
 			globalLog.Error(message);
 		}
-	}
+
+        public static void Fatal(Exception e)
+        {
+            globalLog.Fatal(e.ToString());
+        }
+
+        public static void Fatal(string message)
+        {
+            globalLog.Fatal(message);
+        }
+		
+		public static void Msg(object msg)
+		{
+			Debug(MongoHelper.ToJson(msg));
+		}
+    }
 }
